@@ -1,0 +1,13 @@
+# Copy this file to terraform.tfvars and fill in real values.
+# terraform.tfvars is gitignored — never commit it.
+
+aws_region   = "us-east-1"
+github_org   = "R3X0N05"
+be_repo      = "caa900-BE-grp04"
+fp_repo      = "caa900-FP-grp04"
+iac_repo     = "caa900-IAC-grp04"
+from_email   = "azure.allure99@gmail.com"   # must be verifiable in SES
+
+# GitHub PAT with repo scope — Amplify uses this to clone the FP repo.
+# Generate at: GitHub → Settings → Developer settings → Personal access tokens
+github_token = "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
