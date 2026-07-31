@@ -1,12 +1,11 @@
-# ──────────────────────────────────────────────
-# Locals: reusable CORS OPTIONS mock integration
-# ──────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────
+# Locals
+# ──────────────────────────────────────────────────────────────
 locals {
-  cors_options_integration = {
+  # Standard MOCK CORS OPTIONS integration — reused on every path
+  cors_mock = {
     type = "MOCK"
-    requestTemplates = {
-      "application/json" = "{\"statusCode\": 200}"
-    }
+    requestTemplates = { "application/json" = "{\"statusCode\": 200}" }
     responses = {
       default = {
         statusCode = "200"
@@ -15,34 +14,115 @@ locals {
           "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
           "method.response.header.Access-Control-Allow-Origin"  = "'*'"
         }
-        responseTemplates = {
-          "application/json" = ""
-        }
+        responseTemplates = { "application/json" = "" }
       }
     }
   }
+
+  # Lambda proxy integration helpers — one per function
+  int_products = {
+    type                = "aws_proxy"
+    httpMethod          = "POST"
+    uri                 = aws_lambda_function.products.invoke_arn
+    passthroughBehavior = "when_no_match"
+    timeoutInMillis     = 29000
+    contentHandling     = "CONVERT_TO_TEXT"
+  }
+  int_orders = {
+    type                = "aws_proxy"
+    httpMethod          = "POST"
+    uri                 = aws_lambda_function.orders.invoke_arn
+    passthroughBehavior = "when_no_match"
+    timeoutInMillis     = 29000
+    contentHandling     = "CONVERT_TO_TEXT"
+  }
+  int_cart = {
+    type                = "aws_proxy"
+    httpMethod          = "POST"
+    uri                 = aws_lambda_function.cart.invoke_arn
+    passthroughBehavior = "when_no_match"
+    timeoutInMillis     = 29000
+    contentHandling     = "CONVERT_TO_TEXT"
+  }
+  int_payment = {
+    type                = "aws_proxy"
+    httpMethod          = "POST"
+    uri                 = aws_lambda_function.payment.invoke_arn
+    passthroughBehavior = "when_no_match"
+    timeoutInMillis     = 29000
+    contentHandling     = "CONVERT_TO_TEXT"
+  }
+  int_users = {
+    type                = "aws_proxy"
+    httpMethod          = "POST"
+    uri                 = aws_lambda_function.users.invoke_arn
+    passthroughBehavior = "when_no_match"
+    timeoutInMillis     = 29000
+    contentHandling     = "CONVERT_TO_TEXT"
+  }
 }
 
-# ──────────────────────────────────────────────
-# REST API (OpenAPI body — full spec inline)
-# ──────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────
+# REST API — body matches the exported live spec exactly,
+# with Lambda ARNs replaced by Terraform references so the
+# same file works on any AWS account.
+#
+# NOTE — security gaps that exist in the live API and are
+# reproduced here intentionally:
+#   /order/new POST       — no Cognito auth (Lambda gets empty claims)
+#   /order/{id}/cancel PUT — no Cognito auth
+#   /admin/order/{id}/cancel PUT — no Cognito auth
+#   /admin/product/{id} PUT/DELETE — no Cognito auth
+#   /review PUT/DELETE    — no Cognito auth
+#   /payment/checkout POST — no Cognito auth
+#   /admin/user/{id} PUT/DELETE — no Cognito auth
+# ──────────────────────────────────────────────────────────────
 resource "aws_api_gateway_rest_api" "rexony" {
   name        = "rexony-api"
   description = "Rexony e-commerce API — Group 04"
 
   body = jsonencode({
     openapi = "3.0.1"
-    info = {
-      title   = "Rexony API"
-      version = "1.0"
+    info = { title = "rexony-api", version = "1.0" }
+
+    "x-amazon-apigateway-security-policy" = "TLS_1_0"
+
+    "x-amazon-apigateway-gateway-responses" = {
+      DEFAULT_4XX = {
+        responseParameters = {
+          "gatewayresponse.header.Access-Control-Allow-Origin" = "'*'"
+        }
+        responseTemplates = {
+          "application/json" = "{\"message\":$context.error.messageString}"
+        }
+      }
+      DEFAULT_5XX = {
+        responseParameters = {
+          "gatewayresponse.header.Access-Control-Allow-Origin"  = "'*'"
+          "gatewayresponse.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+        }
+        responseTemplates = {
+          "application/json" = "{\"message\":$context.error.messageString}"
+        }
+      }
+      UNAUTHORIZED = {
+        statusCode = "401"
+        responseParameters = {
+          "gatewayresponse.header.Access-Control-Allow-Origin"  = "'*'"
+          "gatewayresponse.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+        }
+      }
     }
 
     components = {
+      schemas = {
+        Empty = { title = "Empty Schema", type = "object" }
+      }
       securitySchemes = {
         CognitoAuth = {
-          type                          = "apiKey"
-          name                          = "Authorization"
-          in                            = "header"
+          type                           = "apiKey"
+          name                           = "Authorization"
+          in                             = "header"
           "x-amazon-apigateway-authtype" = "cognito_user_pools"
           "x-amazon-apigateway-authorizer" = {
             type           = "cognito_user_pools"
@@ -55,433 +135,256 @@ resource "aws_api_gateway_rest_api" "rexony" {
 
     paths = {
 
-      # ── PRODUCTS ──────────────────────────────────────────────────────────────
+      # ── PRODUCTS ────────────────────────────────────────────
 
       "/products" = {
-        get = {
-          summary = "List all products"
-          "x-amazon-apigateway-integration" = {
-            type                = "aws_proxy"
-            httpMethod          = "POST"
-            uri                 = aws_lambda_function.products.invoke_arn
-            passthroughBehavior = "when_no_match"
-          }
-        }
-        options = {
-          summary   = "CORS preflight"
-          responses = { "200" = { description = "OK" } }
-          "x-amazon-apigateway-integration" = local.cors_options_integration
-        }
-      }
-
-      "/admin/products" = {
-        get = {
-          summary  = "Admin: list all products"
-          security = [{ CognitoAuth = [] }]
-          "x-amazon-apigateway-integration" = {
-            type                = "aws_proxy"
-            httpMethod          = "POST"
-            uri                 = aws_lambda_function.products.invoke_arn
-            passthroughBehavior = "when_no_match"
-          }
-        }
-        options = {
-          summary   = "CORS preflight"
-          responses = { "200" = { description = "OK" } }
-          "x-amazon-apigateway-integration" = local.cors_options_integration
-        }
+        get     = { "x-amazon-apigateway-integration" = local.int_products }
+        options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock }
       }
 
       "/product/{id}" = {
         get = {
-          summary    = "Get product by ID"
           parameters = [{ name = "id", in = "path", required = true, schema = { type = "string" } }]
-          "x-amazon-apigateway-integration" = {
-            type                = "aws_proxy"
-            httpMethod          = "POST"
-            uri                 = aws_lambda_function.products.invoke_arn
-            passthroughBehavior = "when_no_match"
-          }
+          "x-amazon-apigateway-integration" = local.int_products
         }
         options = {
-          summary    = "CORS preflight"
           parameters = [{ name = "id", in = "path", required = true, schema = { type = "string" } }]
           responses  = { "200" = { description = "OK" } }
-          "x-amazon-apigateway-integration" = local.cors_options_integration
+          "x-amazon-apigateway-integration" = local.cors_mock
         }
+      }
+
+      "/reviews" = {
+        get     = { "x-amazon-apigateway-integration" = local.int_products }
+        options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock }
+      }
+
+      # /review — no auth on PUT/DELETE (matches live API)
+      "/review" = {
+        put     = { "x-amazon-apigateway-integration" = local.int_products }
+        delete  = { "x-amazon-apigateway-integration" = local.int_products }
+        options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock }
+      }
+
+      # ── ADMIN PRODUCTS ───────────────────────────────────────
+
+      "/admin/products" = {
+        get = {
+          security = [{ CognitoAuth = [] }]
+          "x-amazon-apigateway-integration" = local.int_products
+        }
+        options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock }
+      }
+
+      # /admin/product (parent — GET exists in live API, same as /admin/products)
+      "/admin/product" = {
+        get = {
+          security = [{ CognitoAuth = [] }]
+          "x-amazon-apigateway-integration" = local.int_products
+        }
+        options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock }
       }
 
       "/admin/product/new" = {
         post = {
-          summary  = "Admin: create product"
           security = [{ CognitoAuth = [] }]
-          "x-amazon-apigateway-integration" = {
-            type                = "aws_proxy"
-            httpMethod          = "POST"
-            uri                 = aws_lambda_function.products.invoke_arn
-            passthroughBehavior = "when_no_match"
-          }
+          "x-amazon-apigateway-integration" = local.int_products
         }
-        options = {
-          summary   = "CORS preflight"
-          responses = { "200" = { description = "OK" } }
-          "x-amazon-apigateway-integration" = local.cors_options_integration
-        }
+        options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock }
       }
 
+      # GET is ADDED here — it was missing from the live API but the Lambda
+      # handler exists. Without this route, the edit-product page 404s.
+      # PUT/DELETE have no auth in the live API — reproduced as-is.
       "/admin/product/{id}" = {
         get = {
-          summary    = "Admin: get product by ID"
           security   = [{ CognitoAuth = [] }]
           parameters = [{ name = "id", in = "path", required = true, schema = { type = "string" } }]
-          "x-amazon-apigateway-integration" = {
-            type                = "aws_proxy"
-            httpMethod          = "POST"
-            uri                 = aws_lambda_function.products.invoke_arn
-            passthroughBehavior = "when_no_match"
-          }
+          "x-amazon-apigateway-integration" = local.int_products
         }
         put = {
-          summary    = "Admin: update product"
-          security   = [{ CognitoAuth = [] }]
           parameters = [{ name = "id", in = "path", required = true, schema = { type = "string" } }]
-          "x-amazon-apigateway-integration" = {
-            type                = "aws_proxy"
-            httpMethod          = "POST"
-            uri                 = aws_lambda_function.products.invoke_arn
-            passthroughBehavior = "when_no_match"
-          }
+          "x-amazon-apigateway-integration" = local.int_products
         }
         delete = {
-          summary    = "Admin: delete product"
-          security   = [{ CognitoAuth = [] }]
           parameters = [{ name = "id", in = "path", required = true, schema = { type = "string" } }]
-          "x-amazon-apigateway-integration" = {
-            type                = "aws_proxy"
-            httpMethod          = "POST"
-            uri                 = aws_lambda_function.products.invoke_arn
-            passthroughBehavior = "when_no_match"
-          }
+          "x-amazon-apigateway-integration" = local.int_products
         }
         options = {
-          summary    = "CORS preflight"
           parameters = [{ name = "id", in = "path", required = true, schema = { type = "string" } }]
           responses  = { "200" = { description = "OK" } }
-          "x-amazon-apigateway-integration" = local.cors_options_integration
+          "x-amazon-apigateway-integration" = local.cors_mock
         }
       }
 
-      # ── REVIEWS ───────────────────────────────────────────────────────────────
+      # ── ORDERS ───────────────────────────────────────────────
 
-      "/reviews" = {
-        get = {
-          summary = "Get reviews"
-          "x-amazon-apigateway-integration" = {
-            type                = "aws_proxy"
-            httpMethod          = "POST"
-            uri                 = aws_lambda_function.products.invoke_arn
-            passthroughBehavior = "when_no_match"
-          }
-        }
-        options = {
-          summary   = "CORS preflight"
-          responses = { "200" = { description = "OK" } }
-          "x-amazon-apigateway-integration" = local.cors_options_integration
-        }
-      }
+      # Parent paths — OPTIONS only (API Gateway tree nodes)
+      "/order"   = { options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock } }
+      "/orders"  = { options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock } }
 
-      "/review" = {
-        put = {
-          summary  = "Add or update review"
-          security = [{ CognitoAuth = [] }]
-          "x-amazon-apigateway-integration" = {
-            type                = "aws_proxy"
-            httpMethod          = "POST"
-            uri                 = aws_lambda_function.products.invoke_arn
-            passthroughBehavior = "when_no_match"
-          }
-        }
-        delete = {
-          summary  = "Delete review"
-          security = [{ CognitoAuth = [] }]
-          "x-amazon-apigateway-integration" = {
-            type                = "aws_proxy"
-            httpMethod          = "POST"
-            uri                 = aws_lambda_function.products.invoke_arn
-            passthroughBehavior = "when_no_match"
-          }
-        }
-        options = {
-          summary   = "CORS preflight"
-          responses = { "200" = { description = "OK" } }
-          "x-amazon-apigateway-integration" = local.cors_options_integration
-        }
-      }
-
-      # ── ORDERS ────────────────────────────────────────────────────────────────
-
+      # /order/new has no auth in live API
       "/order/new" = {
-        post = {
-          summary  = "Create order"
-          security = [{ CognitoAuth = [] }]
-          "x-amazon-apigateway-integration" = {
-            type                = "aws_proxy"
-            httpMethod          = "POST"
-            uri                 = aws_lambda_function.orders.invoke_arn
-            passthroughBehavior = "when_no_match"
-          }
-        }
-        options = {
-          summary   = "CORS preflight"
-          responses = { "200" = { description = "OK" } }
-          "x-amazon-apigateway-integration" = local.cors_options_integration
-        }
+        post    = { "x-amazon-apigateway-integration" = local.int_orders }
+        options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock }
       }
 
       "/orders/me" = {
         get = {
-          summary  = "Get my orders"
           security = [{ CognitoAuth = [] }]
-          "x-amazon-apigateway-integration" = {
-            type                = "aws_proxy"
-            httpMethod          = "POST"
-            uri                 = aws_lambda_function.orders.invoke_arn
-            passthroughBehavior = "when_no_match"
-          }
+          "x-amazon-apigateway-integration" = local.int_orders
         }
+        options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock }
+      }
+
+      "/order/{id}" = {
         options = {
-          summary   = "CORS preflight"
-          responses = { "200" = { description = "OK" } }
-          "x-amazon-apigateway-integration" = local.cors_options_integration
+          parameters = [{ name = "id", in = "path", required = true, schema = { type = "string" } }]
+          responses  = { "200" = { description = "OK" } }
+          "x-amazon-apigateway-integration" = local.cors_mock
         }
       }
 
+      # /order/{id}/cancel — no auth in live API
       "/order/{id}/cancel" = {
         put = {
-          summary    = "Cancel order"
-          security   = [{ CognitoAuth = [] }]
           parameters = [{ name = "id", in = "path", required = true, schema = { type = "string" } }]
-          "x-amazon-apigateway-integration" = {
-            type                = "aws_proxy"
-            httpMethod          = "POST"
-            uri                 = aws_lambda_function.orders.invoke_arn
-            passthroughBehavior = "when_no_match"
-          }
+          "x-amazon-apigateway-integration" = local.int_orders
         }
         options = {
-          summary    = "CORS preflight"
           parameters = [{ name = "id", in = "path", required = true, schema = { type = "string" } }]
           responses  = { "200" = { description = "OK" } }
-          "x-amazon-apigateway-integration" = local.cors_options_integration
+          "x-amazon-apigateway-integration" = local.cors_mock
         }
       }
 
       "/admin/orders" = {
         get = {
-          summary  = "Admin: list all orders"
           security = [{ CognitoAuth = [] }]
-          "x-amazon-apigateway-integration" = {
-            type                = "aws_proxy"
-            httpMethod          = "POST"
-            uri                 = aws_lambda_function.orders.invoke_arn
-            passthroughBehavior = "when_no_match"
-          }
+          "x-amazon-apigateway-integration" = local.int_orders
         }
-        options = {
-          summary   = "CORS preflight"
-          responses = { "200" = { description = "OK" } }
-          "x-amazon-apigateway-integration" = local.cors_options_integration
-        }
+        options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock }
+      }
+
+      "/admin/order" = {
+        options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock }
       }
 
       "/admin/order/{id}" = {
         put = {
-          summary    = "Admin: update order status"
           security   = [{ CognitoAuth = [] }]
           parameters = [{ name = "id", in = "path", required = true, schema = { type = "string" } }]
-          "x-amazon-apigateway-integration" = {
-            type                = "aws_proxy"
-            httpMethod          = "POST"
-            uri                 = aws_lambda_function.orders.invoke_arn
-            passthroughBehavior = "when_no_match"
-          }
+          "x-amazon-apigateway-integration" = local.int_orders
         }
         delete = {
-          summary    = "Admin: delete order"
           security   = [{ CognitoAuth = [] }]
           parameters = [{ name = "id", in = "path", required = true, schema = { type = "string" } }]
-          "x-amazon-apigateway-integration" = {
-            type                = "aws_proxy"
-            httpMethod          = "POST"
-            uri                 = aws_lambda_function.orders.invoke_arn
-            passthroughBehavior = "when_no_match"
-          }
+          "x-amazon-apigateway-integration" = local.int_orders
         }
         options = {
-          summary    = "CORS preflight"
           parameters = [{ name = "id", in = "path", required = true, schema = { type = "string" } }]
           responses  = { "200" = { description = "OK" } }
-          "x-amazon-apigateway-integration" = local.cors_options_integration
+          "x-amazon-apigateway-integration" = local.cors_mock
         }
       }
 
-      # ── CART ──────────────────────────────────────────────────────────────────
+      # /admin/order/{id}/cancel — existed in live API, no auth
+      "/admin/order/{id}/cancel" = {
+        put = {
+          parameters = [{ name = "id", in = "path", required = true, schema = { type = "string" } }]
+          "x-amazon-apigateway-integration" = local.int_orders
+        }
+        options = {
+          parameters = [{ name = "id", in = "path", required = true, schema = { type = "string" } }]
+          responses  = { "200" = { description = "OK" } }
+          "x-amazon-apigateway-integration" = local.cors_mock
+        }
+      }
+
+      # ── CART ─────────────────────────────────────────────────
 
       "/cart" = {
         get = {
-          summary  = "Get cart"
           security = [{ CognitoAuth = [] }]
-          "x-amazon-apigateway-integration" = {
-            type                = "aws_proxy"
-            httpMethod          = "POST"
-            uri                 = aws_lambda_function.cart.invoke_arn
-            passthroughBehavior = "when_no_match"
-          }
+          "x-amazon-apigateway-integration" = local.int_cart
         }
         post = {
-          summary  = "Add item to cart"
           security = [{ CognitoAuth = [] }]
-          "x-amazon-apigateway-integration" = {
-            type                = "aws_proxy"
-            httpMethod          = "POST"
-            uri                 = aws_lambda_function.cart.invoke_arn
-            passthroughBehavior = "when_no_match"
-          }
+          "x-amazon-apigateway-integration" = local.int_cart
         }
         put = {
-          summary  = "Update cart item quantity"
           security = [{ CognitoAuth = [] }]
-          "x-amazon-apigateway-integration" = {
-            type                = "aws_proxy"
-            httpMethod          = "POST"
-            uri                 = aws_lambda_function.cart.invoke_arn
-            passthroughBehavior = "when_no_match"
-          }
+          "x-amazon-apigateway-integration" = local.int_cart
         }
-        options = {
-          summary   = "CORS preflight"
-          responses = { "200" = { description = "OK" } }
-          "x-amazon-apigateway-integration" = local.cors_options_integration
-        }
+        options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock }
       }
 
       "/cart/clear" = {
         delete = {
-          summary  = "Clear entire cart"
           security = [{ CognitoAuth = [] }]
-          "x-amazon-apigateway-integration" = {
-            type                = "aws_proxy"
-            httpMethod          = "POST"
-            uri                 = aws_lambda_function.cart.invoke_arn
-            passthroughBehavior = "when_no_match"
-          }
+          "x-amazon-apigateway-integration" = local.int_cart
         }
-        options = {
-          summary   = "CORS preflight"
-          responses = { "200" = { description = "OK" } }
-          "x-amazon-apigateway-integration" = local.cors_options_integration
-        }
+        options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock }
       }
 
       "/cart/{productId}" = {
         delete = {
-          summary    = "Remove item from cart"
           security   = [{ CognitoAuth = [] }]
           parameters = [{ name = "productId", in = "path", required = true, schema = { type = "string" } }]
-          "x-amazon-apigateway-integration" = {
-            type                = "aws_proxy"
-            httpMethod          = "POST"
-            uri                 = aws_lambda_function.cart.invoke_arn
-            passthroughBehavior = "when_no_match"
-          }
+          "x-amazon-apigateway-integration" = local.int_cart
         }
         options = {
-          summary    = "CORS preflight"
           parameters = [{ name = "productId", in = "path", required = true, schema = { type = "string" } }]
           responses  = { "200" = { description = "OK" } }
-          "x-amazon-apigateway-integration" = local.cors_options_integration
+          "x-amazon-apigateway-integration" = local.cors_mock
         }
       }
 
-      # ── PAYMENT ───────────────────────────────────────────────────────────────
+      # ── PAYMENT ──────────────────────────────────────────────
 
+      "/payment" = {
+        options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock }
+      }
+
+      # /payment/checkout — no auth in live API
       "/payment/checkout" = {
-        post = {
-          summary  = "Stripe checkout"
-          security = [{ CognitoAuth = [] }]
-          "x-amazon-apigateway-integration" = {
-            type                = "aws_proxy"
-            httpMethod          = "POST"
-            uri                 = aws_lambda_function.payment.invoke_arn
-            passthroughBehavior = "when_no_match"
-          }
-        }
-        options = {
-          summary   = "CORS preflight"
-          responses = { "200" = { description = "OK" } }
-          "x-amazon-apigateway-integration" = local.cors_options_integration
-        }
+        post    = { "x-amazon-apigateway-integration" = local.int_payment }
+        options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock }
       }
 
-      # ── USERS (admin) ─────────────────────────────────────────────────────────
+      # ── USERS (admin) ─────────────────────────────────────────
+
+      "/admin/user" = {
+        options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock }
+      }
 
       "/admin/users" = {
         get = {
-          summary  = "Admin: list all Cognito users"
           security = [{ CognitoAuth = [] }]
-          "x-amazon-apigateway-integration" = {
-            type                = "aws_proxy"
-            httpMethod          = "POST"
-            uri                 = aws_lambda_function.users.invoke_arn
-            passthroughBehavior = "when_no_match"
-          }
+          "x-amazon-apigateway-integration" = local.int_users
         }
-        options = {
-          summary   = "CORS preflight"
-          responses = { "200" = { description = "OK" } }
-          "x-amazon-apigateway-integration" = local.cors_options_integration
-        }
+        options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock }
       }
 
+      # /admin/user/{id} GET has auth; PUT/DELETE do not (matches live API)
       "/admin/user/{id}" = {
         get = {
-          summary    = "Admin: get user by sub"
           security   = [{ CognitoAuth = [] }]
           parameters = [{ name = "id", in = "path", required = true, schema = { type = "string" } }]
-          "x-amazon-apigateway-integration" = {
-            type                = "aws_proxy"
-            httpMethod          = "POST"
-            uri                 = aws_lambda_function.users.invoke_arn
-            passthroughBehavior = "when_no_match"
-          }
+          "x-amazon-apigateway-integration" = local.int_users
         }
         put = {
-          summary    = "Admin: update user (role etc.)"
-          security   = [{ CognitoAuth = [] }]
           parameters = [{ name = "id", in = "path", required = true, schema = { type = "string" } }]
-          "x-amazon-apigateway-integration" = {
-            type                = "aws_proxy"
-            httpMethod          = "POST"
-            uri                 = aws_lambda_function.users.invoke_arn
-            passthroughBehavior = "when_no_match"
-          }
+          "x-amazon-apigateway-integration" = local.int_users
         }
         delete = {
-          summary    = "Admin: disable/delete user"
-          security   = [{ CognitoAuth = [] }]
           parameters = [{ name = "id", in = "path", required = true, schema = { type = "string" } }]
-          "x-amazon-apigateway-integration" = {
-            type                = "aws_proxy"
-            httpMethod          = "POST"
-            uri                 = aws_lambda_function.users.invoke_arn
-            passthroughBehavior = "when_no_match"
-          }
+          "x-amazon-apigateway-integration" = local.int_users
         }
         options = {
-          summary    = "CORS preflight"
           parameters = [{ name = "id", in = "path", required = true, schema = { type = "string" } }]
           responses  = { "200" = { description = "OK" } }
-          "x-amazon-apigateway-integration" = local.cors_options_integration
+          "x-amazon-apigateway-integration" = local.cors_mock
         }
       }
 
@@ -492,49 +395,10 @@ resource "aws_api_gateway_rest_api" "rexony" {
     types = ["REGIONAL"]
   }
 
-  tags = {
-    Project = "rexony"
-    Group   = "04"
-  }
+  tags = { Project = "rexony", Group = "04" }
 }
 
-# ──────────────────────────────────────────────
-# Gateway-level CORS headers on auth errors
-# (without these, Cognito 401/403 responses
-#  also strip CORS headers and confuse the browser)
-# ──────────────────────────────────────────────
-resource "aws_api_gateway_gateway_response" "unauthorized" {
-  rest_api_id   = aws_api_gateway_rest_api.rexony.id
-  response_type = "UNAUTHORIZED"
-  status_code   = "401"
-  response_parameters = {
-    "gatewayresponse.header.Access-Control-Allow-Origin"  = "'*'"
-    "gatewayresponse.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
-  }
-}
-
-resource "aws_api_gateway_gateway_response" "access_denied" {
-  rest_api_id   = aws_api_gateway_rest_api.rexony.id
-  response_type = "ACCESS_DENIED"
-  status_code   = "403"
-  response_parameters = {
-    "gatewayresponse.header.Access-Control-Allow-Origin"  = "'*'"
-    "gatewayresponse.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
-  }
-}
-
-resource "aws_api_gateway_gateway_response" "default_5xx" {
-  rest_api_id   = aws_api_gateway_rest_api.rexony.id
-  response_type = "DEFAULT_5XX"
-  response_parameters = {
-    "gatewayresponse.header.Access-Control-Allow-Origin"  = "'*'"
-    "gatewayresponse.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
-  }
-}
-
-# ──────────────────────────────────────────────
-# Deployment — retriggers whenever the body changes
-# ──────────────────────────────────────────────
+# ── Deployment ───────────────────────────────────────────────
 resource "aws_api_gateway_deployment" "rexony" {
   rest_api_id = aws_api_gateway_rest_api.rexony.id
 
@@ -547,57 +411,39 @@ resource "aws_api_gateway_deployment" "rexony" {
   }
 }
 
-# ──────────────────────────────────────────────
-# CloudWatch log group for access logs
-# ──────────────────────────────────────────────
+# ── CloudWatch log group ─────────────────────────────────────
 resource "aws_cloudwatch_log_group" "api_gateway" {
   name              = "/aws/apigateway/rexony"
   retention_in_days = 7
-
-  tags = {
-    Project = "rexony"
-    Group   = "04"
-  }
+  tags              = { Project = "rexony", Group = "04" }
 }
 
-# ──────────────────────────────────────────────
-# Stage: prod
-# ──────────────────────────────────────────────
+# ── Stage ────────────────────────────────────────────────────
 resource "aws_api_gateway_stage" "prod" {
   deployment_id = aws_api_gateway_deployment.rexony.id
   rest_api_id   = aws_api_gateway_rest_api.rexony.id
   stage_name    = "prod"
 
-  xray_tracing_enabled = false  # enable if you want X-Ray traces
-
   access_log_settings {
     destination_arn = aws_cloudwatch_log_group.api_gateway.arn
     format = jsonencode({
-      requestId               = "$context.requestId"
-      ip                      = "$context.identity.sourceIp"
-      requestTime             = "$context.requestTime"
-      httpMethod              = "$context.httpMethod"
-      resourcePath            = "$context.resourcePath"
-      status                  = "$context.status"
-      responseLength          = "$context.responseLength"
-      integrationError        = "$context.integrationErrorMessage"
+      requestId        = "$context.requestId"
+      ip               = "$context.identity.sourceIp"
+      requestTime      = "$context.requestTime"
+      httpMethod       = "$context.httpMethod"
+      resourcePath     = "$context.resourcePath"
+      status           = "$context.status"
+      responseLength   = "$context.responseLength"
+      integrationError = "$context.integrationErrorMessage"
     })
   }
 
-  tags = {
-    Project = "rexony"
-    Group   = "04"
-  }
+  tags = { Project = "rexony", Group = "04" }
 
-  depends_on = [
-    aws_cloudwatch_log_group.api_gateway,
-    aws_api_gateway_deployment.rexony,
-  ]
+  depends_on = [aws_cloudwatch_log_group.api_gateway]
 }
 
-# ──────────────────────────────────────────────
-# Lambda permissions — allow API Gateway to invoke
-# ──────────────────────────────────────────────
+# ── Lambda invoke permissions ────────────────────────────────
 resource "aws_lambda_permission" "apigw_products" {
   statement_id  = "AllowAPIGatewayInvoke"
   action        = "lambda:InvokeFunction"
