@@ -154,6 +154,11 @@ resource "aws_api_gateway_rest_api" "rexony" {
         }
       }
 
+      "/contact" = {
+        post    = { "x-amazon-apigateway-integration" = local.int_orders }
+        options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock }
+      }
+
       "/reviews" = {
         get     = { "x-amazon-apigateway-integration" = local.int_products }
         options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock }
