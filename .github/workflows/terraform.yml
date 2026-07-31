@@ -1,13 +1,12 @@
 name: Terraform
 
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:  # manual trigger only — run from Actions tab
   pull_request:
-    branches: [main]
+    branches: [main]  # plan runs automatically on PRs
 
 permissions:
-  id-token: write   # required for OIDC
+  id-token: write
   contents: read
   pull-requests: write
 
@@ -21,14 +20,14 @@ env:
 # the GitHub OIDC role that this workflow uses doesn't exist yet.
 #
 # Steps for a fresh AWS account:
-#   1. aws configure (admin credentials)
-#   2. bash bootstrap.sh              # creates S3 bucket + DynamoDB lock table
+#   1. aws configure  (use admin credentials)
+#   2. bash bootstrap.sh        # creates S3 bucket + DynamoDB lock table
 #   3. terraform init
 #   4. terraform apply -var="github_token=ghp_xxx" -var-file=terraform.tfvars
-#   5. Copy the github_iac_role_arn output into this repo's GitHub secret:
-#      Settings → Secrets → Actions → AWS_ROLE_ARN
-#   6. Add GH_PAT secret (your GitHub PAT) the same way.
-#   7. All future changes can now go through this workflow.
+#   5. Copy github_iac_role_arn from outputs → add as AWS_ROLE_ARN secret
+#      in this repo: Settings → Secrets → Actions → New repository secret
+#   6. Add your GitHub PAT as GH_PAT secret the same way
+#   7. All future applies can now be triggered manually from the Actions tab
 # ─────────────────────────────────────────────────────────────────────────────
 
 jobs:
@@ -75,8 +74,8 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const fs   = require('fs');
-            const raw  = fs.readFileSync('plan_output.txt', 'utf8');
+            const fs  = require('fs');
+            const raw = fs.readFileSync('plan_output.txt', 'utf8');
             const body = raw.length > 60000
               ? raw.substring(0, 60000) + '\n...(output truncated)'
               : raw;
@@ -91,12 +90,12 @@ jobs:
         if: steps.plan.outcome == 'failure'
         run: exit 1
 
-  # ── Push to main: apply ───────────────────────────────────────────────────
+  # ── Manual: apply ────────────────────────────────────────────────────────
   apply:
     name: Terraform Apply
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    environment: prod   # optional: add approval gate in GitHub repo settings
+    if: github.event_name == 'workflow_dispatch'
+    environment: prod
 
     steps:
       - name: Checkout
