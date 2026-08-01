@@ -1,6 +1,6 @@
 resource "aws_cognito_user_pool" "rexony" {
   name                = "rexony-user-pool"
-  deletion_protection = "ACTIVE"
+  deletion_protection = "INACTIVE"
 
   password_policy {
     minimum_length                   = 8
