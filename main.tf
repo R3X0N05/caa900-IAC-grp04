@@ -12,7 +12,9 @@ terraform {
   }
 
   backend "s3" {
-    bucket         = "rexony-tfstate-257925263766" # update per account after bootstrap.sh
+    # bucket is resolved dynamically in CI — do NOT hardcode it here.
+    # The workflow runs bootstrap and passes:
+    #   terraform init -backend-config="bucket=rexony-tfstate-<account_id>"
     key            = "rexony/terraform.tfstate"
     region         = "us-east-1"
     dynamodb_table = "rexony-tfstate-lock"
