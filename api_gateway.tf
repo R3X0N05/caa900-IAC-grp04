@@ -63,19 +63,7 @@ locals {
 }
 
 # ──────────────────────────────────────────────────────────────
-# REST API — body matches the exported live spec exactly,
-# with Lambda ARNs replaced by Terraform references so the
-# same file works on any AWS account.
-#
-# NOTE — security gaps that exist in the live API and are
-# reproduced here intentionally:
-#   /order/new POST       — no Cognito auth (Lambda gets empty claims)
-#   /order/{id}/cancel PUT — no Cognito auth
-#   /admin/order/{id}/cancel PUT — no Cognito auth
-#   /admin/product/{id} PUT/DELETE — no Cognito auth
-#   /review PUT/DELETE    — no Cognito auth
-#   /payment/checkout POST — no Cognito auth
-#   /admin/user/{id} PUT/DELETE — no Cognito auth
+# REST API
 # ──────────────────────────────────────────────────────────────
 resource "aws_api_gateway_rest_api" "rexony" {
   name        = "rexony-api"
@@ -164,7 +152,6 @@ resource "aws_api_gateway_rest_api" "rexony" {
         options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock }
       }
 
-      # /review — no auth on PUT/DELETE (matches live API)
       "/review" = {
         put     = { "x-amazon-apigateway-integration" = local.int_products }
         delete  = { "x-amazon-apigateway-integration" = local.int_products }
@@ -181,7 +168,6 @@ resource "aws_api_gateway_rest_api" "rexony" {
         options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock }
       }
 
-      # /admin/product (parent — GET exists in live API, same as /admin/products)
       "/admin/product" = {
         get = {
           security = [{ CognitoAuth = [] }]
@@ -198,9 +184,6 @@ resource "aws_api_gateway_rest_api" "rexony" {
         options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock }
       }
 
-      # GET is ADDED here — it was missing from the live API but the Lambda
-      # handler exists. Without this route, the edit-product page 404s.
-      # PUT/DELETE have no auth in the live API — reproduced as-is.
       "/admin/product/{id}" = {
         get = {
           security   = [{ CognitoAuth = [] }]
@@ -224,11 +207,9 @@ resource "aws_api_gateway_rest_api" "rexony" {
 
       # ── ORDERS ───────────────────────────────────────────────
 
-      # Parent paths — OPTIONS only (API Gateway tree nodes)
       "/order"   = { options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock } }
       "/orders"  = { options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock } }
 
-      # /order/new has no auth in live API
       "/order/new" = {
         post    = { "x-amazon-apigateway-integration" = local.int_orders }
         options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock }
@@ -250,7 +231,6 @@ resource "aws_api_gateway_rest_api" "rexony" {
         }
       }
 
-      # /order/{id}/cancel — no auth in live API
       "/order/{id}/cancel" = {
         put = {
           parameters = [{ name = "id", in = "path", required = true, schema = { type = "string" } }]
@@ -293,7 +273,6 @@ resource "aws_api_gateway_rest_api" "rexony" {
         }
       }
 
-      # /admin/order/{id}/cancel — existed in live API, no auth
       "/admin/order/{id}/cancel" = {
         put = {
           parameters = [{ name = "id", in = "path", required = true, schema = { type = "string" } }]
@@ -351,7 +330,6 @@ resource "aws_api_gateway_rest_api" "rexony" {
         options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock }
       }
 
-      # /payment/checkout — no auth in live API
       "/payment/checkout" = {
         post    = { "x-amazon-apigateway-integration" = local.int_payment }
         options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock }
@@ -371,7 +349,6 @@ resource "aws_api_gateway_rest_api" "rexony" {
         options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock }
       }
 
-      # /admin/user/{id} GET has auth; PUT/DELETE do not (matches live API)
       "/admin/user/{id}" = {
         get = {
           security   = [{ CognitoAuth = [] }]
@@ -423,6 +400,28 @@ resource "aws_cloudwatch_log_group" "api_gateway" {
   tags              = { Project = "rexony", Group = "04" }
 }
 
+# ── CloudWatch account-level role (required for API GW logging) ──
+resource "aws_iam_role" "api_gateway_cloudwatch" {
+  name = "rexony-apigw-cloudwatch-role"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "apigateway.amazonaws.com" }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "api_gateway_cloudwatch" {
+  role       = aws_iam_role.api_gateway_cloudwatch.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
+}
+
+resource "aws_api_gateway_account" "rexony" {
+  cloudwatch_role_arn = aws_iam_role.api_gateway_cloudwatch.arn
+}
+
 # ── Stage ────────────────────────────────────────────────────
 resource "aws_api_gateway_stage" "prod" {
   deployment_id = aws_api_gateway_deployment.rexony.id
@@ -445,7 +444,7 @@ resource "aws_api_gateway_stage" "prod" {
 
   tags = { Project = "rexony", Group = "04" }
 
-  depends_on = [aws_cloudwatch_log_group.api_gateway]
+  depends_on = [aws_api_gateway_account.rexony]
 }
 
 # ── Lambda invoke permissions ────────────────────────────────

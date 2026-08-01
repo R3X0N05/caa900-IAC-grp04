@@ -78,51 +78,111 @@ resource "aws_iam_role" "orders" {
   name               = "rexony-orders-role"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume.json
 }
-resource "aws_iam_role_policy" "orders_logs"     { role = aws_iam_role.orders.id; policy = data.aws_iam_policy_document.logs.json }
-resource "aws_iam_role_policy" "orders_dynamodb" { role = aws_iam_role.orders.id; policy = data.aws_iam_policy_document.dynamodb.json }
-resource "aws_iam_role_policy" "orders_secrets"  { role = aws_iam_role.orders.id; policy = data.aws_iam_policy_document.secrets.json }
-resource "aws_iam_role_policy" "orders_ses"      { role = aws_iam_role.orders.id; policy = data.aws_iam_policy_document.ses.json }
+
+resource "aws_iam_role_policy" "orders_logs" {
+  role   = aws_iam_role.orders.id
+  policy = data.aws_iam_policy_document.logs.json
+}
+
+resource "aws_iam_role_policy" "orders_dynamodb" {
+  role   = aws_iam_role.orders.id
+  policy = data.aws_iam_policy_document.dynamodb.json
+}
+
+resource "aws_iam_role_policy" "orders_secrets" {
+  role   = aws_iam_role.orders.id
+  policy = data.aws_iam_policy_document.secrets.json
+}
+
+resource "aws_iam_role_policy" "orders_ses" {
+  role   = aws_iam_role.orders.id
+  policy = data.aws_iam_policy_document.ses.json
+}
 
 # ── rexony-payment ────────────────────────────────────────────────────────────
 resource "aws_iam_role" "payment" {
   name               = "rexony-payment-role"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume.json
 }
-resource "aws_iam_role_policy" "payment_logs"    { role = aws_iam_role.payment.id; policy = data.aws_iam_policy_document.logs.json }
-resource "aws_iam_role_policy" "payment_secrets" { role = aws_iam_role.payment.id; policy = data.aws_iam_policy_document.secrets.json }
+
+resource "aws_iam_role_policy" "payment_logs" {
+  role   = aws_iam_role.payment.id
+  policy = data.aws_iam_policy_document.logs.json
+}
+
+resource "aws_iam_role_policy" "payment_secrets" {
+  role   = aws_iam_role.payment.id
+  policy = data.aws_iam_policy_document.secrets.json
+}
 
 # ── rexony-products ───────────────────────────────────────────────────────────
 resource "aws_iam_role" "products" {
   name               = "rexony-products-role"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume.json
 }
-resource "aws_iam_role_policy" "products_logs"     { role = aws_iam_role.products.id; policy = data.aws_iam_policy_document.logs.json }
-resource "aws_iam_role_policy" "products_dynamodb" { role = aws_iam_role.products.id; policy = data.aws_iam_policy_document.dynamodb.json }
+
+resource "aws_iam_role_policy" "products_logs" {
+  role   = aws_iam_role.products.id
+  policy = data.aws_iam_policy_document.logs.json
+}
+
+resource "aws_iam_role_policy" "products_dynamodb" {
+  role   = aws_iam_role.products.id
+  policy = data.aws_iam_policy_document.dynamodb.json
+}
 
 # ── rexony-cart ───────────────────────────────────────────────────────────────
 resource "aws_iam_role" "cart" {
   name               = "rexony-cart-role"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume.json
 }
-resource "aws_iam_role_policy" "cart_logs"     { role = aws_iam_role.cart.id; policy = data.aws_iam_policy_document.logs.json }
-resource "aws_iam_role_policy" "cart_dynamodb" { role = aws_iam_role.cart.id; policy = data.aws_iam_policy_document.dynamodb.json }
+
+resource "aws_iam_role_policy" "cart_logs" {
+  role   = aws_iam_role.cart.id
+  policy = data.aws_iam_policy_document.logs.json
+}
+
+resource "aws_iam_role_policy" "cart_dynamodb" {
+  role   = aws_iam_role.cart.id
+  policy = data.aws_iam_policy_document.dynamodb.json
+}
 
 # ── rexony-users ──────────────────────────────────────────────────────────────
 resource "aws_iam_role" "users" {
   name               = "rexony-users-role"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume.json
 }
-resource "aws_iam_role_policy" "users_logs"    { role = aws_iam_role.users.id; policy = data.aws_iam_policy_document.logs.json }
-resource "aws_iam_role_policy" "users_cognito" { role = aws_iam_role.users.id; policy = data.aws_iam_policy_document.cognito_admin.json }
+
+resource "aws_iam_role_policy" "users_logs" {
+  role   = aws_iam_role.users.id
+  policy = data.aws_iam_policy_document.logs.json
+}
+
+resource "aws_iam_role_policy" "users_cognito" {
+  role   = aws_iam_role.users.id
+  policy = data.aws_iam_policy_document.cognito_admin.json
+}
 
 # ── rexony-sns ────────────────────────────────────────────────────────────────
 resource "aws_iam_role" "sns" {
   name               = "rexony-sns-role"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume.json
 }
-resource "aws_iam_role_policy" "sns_logs"    { role = aws_iam_role.sns.id; policy = data.aws_iam_policy_document.logs.json }
-resource "aws_iam_role_policy" "sns_ses"     { role = aws_iam_role.sns.id; policy = data.aws_iam_policy_document.ses.json }
-resource "aws_iam_role_policy" "sns_streams" { role = aws_iam_role.sns.id; policy = data.aws_iam_policy_document.ddb_streams.json }
+
+resource "aws_iam_role_policy" "sns_logs" {
+  role   = aws_iam_role.sns.id
+  policy = data.aws_iam_policy_document.logs.json
+}
+
+resource "aws_iam_role_policy" "sns_ses" {
+  role   = aws_iam_role.sns.id
+  policy = data.aws_iam_policy_document.ses.json
+}
+
+resource "aws_iam_role_policy" "sns_streams" {
+  role   = aws_iam_role.sns.id
+  policy = data.aws_iam_policy_document.ddb_streams.json
+}
 
 # ── GitHub Actions OIDC ───────────────────────────────────────────────────────
 resource "aws_iam_openid_connect_provider" "github" {
@@ -147,11 +207,17 @@ resource "aws_iam_role" "github_be" {
       Principal = { Federated = local.github_oidc_arn }
       Action    = "sts:AssumeRoleWithWebIdentity"
       Condition = merge(local.oidc_conditions, {
-        StringLike = { "token.actions.githubusercontent.com:sub" = "repo:*/${var.be_repo}*:environment:prod" }
+        StringLike = {
+          "token.actions.githubusercontent.com:sub" = [
+            "repo:*/${var.be_repo}*:environment:prod",
+            "repo:*/${var.be_repo}*:environment:new-infra"
+          ]
+        }
       })
     }]
   })
 }
+
 resource "aws_iam_role_policy" "github_be" {
   role = aws_iam_role.github_be.id
   policy = jsonencode({
@@ -173,11 +239,18 @@ resource "aws_iam_role" "github_fp" {
       Principal = { Federated = local.github_oidc_arn }
       Action    = "sts:AssumeRoleWithWebIdentity"
       Condition = merge(local.oidc_conditions, {
-        StringLike = { "token.actions.githubusercontent.com:sub" = "repo:*/${var.fp_repo}*:environment:prod" }
+        StringLike = {
+          "token.actions.githubusercontent.com:sub" = [
+            "repo:*/${var.fp_repo}*:environment:prod",
+            "repo:*/${var.fp_repo}*:environment:new-infra",
+            "repo:*/${var.fp_repo}*:environment:tfinfra"
+          ]
+        }
       })
     }]
   })
 }
+
 resource "aws_iam_role_policy" "github_fp" {
   role = aws_iam_role.github_fp.id
   policy = jsonencode({
@@ -199,11 +272,17 @@ resource "aws_iam_role" "github_iac" {
       Principal = { Federated = local.github_oidc_arn }
       Action    = "sts:AssumeRoleWithWebIdentity"
       Condition = merge(local.oidc_conditions, {
-        StringLike = { "token.actions.githubusercontent.com:sub" = "repo:*/${var.iac_repo}*:environment:prod" }
+        StringLike = {
+          "token.actions.githubusercontent.com:sub" = [
+            "repo:*/${var.iac_repo}*:environment:prod",
+            "repo:*/${var.iac_repo}*:environment:new-infra"
+          ]
+        }
       })
     }]
   })
 }
+
 resource "aws_iam_role_policy_attachment" "github_iac_admin" {
   role       = aws_iam_role.github_iac.name
   policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"

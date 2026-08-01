@@ -9,7 +9,7 @@ data "archive_file" "placeholder" {
 
 locals {
   lambda_defaults = {
-    runtime     = "nodejs24.x"
+    runtime     = "nodejs22.x"
     handler     = "index.handler"
     timeout     = 3
     memory_size = 128
@@ -102,10 +102,3 @@ resource "aws_lambda_event_source_mapping" "orders_stream" {
     filter { pattern = jsonencode({ eventName = ["INSERT"] }) }
   }
 }
-
-# API Gateway invoke permissions
-resource "aws_lambda_permission" "orders"   { statement_id = "AllowAPIGW"; action = "lambda:InvokeFunction"; function_name = aws_lambda_function.orders.function_name;   principal = "apigateway.amazonaws.com"; source_arn = "${aws_api_gateway_rest_api.rexony.execution_arn}/*/*" }
-resource "aws_lambda_permission" "payment"  { statement_id = "AllowAPIGW"; action = "lambda:InvokeFunction"; function_name = aws_lambda_function.payment.function_name;  principal = "apigateway.amazonaws.com"; source_arn = "${aws_api_gateway_rest_api.rexony.execution_arn}/*/*" }
-resource "aws_lambda_permission" "products" { statement_id = "AllowAPIGW"; action = "lambda:InvokeFunction"; function_name = aws_lambda_function.products.function_name; principal = "apigateway.amazonaws.com"; source_arn = "${aws_api_gateway_rest_api.rexony.execution_arn}/*/*" }
-resource "aws_lambda_permission" "cart"     { statement_id = "AllowAPIGW"; action = "lambda:InvokeFunction"; function_name = aws_lambda_function.cart.function_name;     principal = "apigateway.amazonaws.com"; source_arn = "${aws_api_gateway_rest_api.rexony.execution_arn}/*/*" }
-resource "aws_lambda_permission" "users"    { statement_id = "AllowAPIGW"; action = "lambda:InvokeFunction"; function_name = aws_lambda_function.users.function_name;    principal = "apigateway.amazonaws.com"; source_arn = "${aws_api_gateway_rest_api.rexony.execution_arn}/*/*" }
