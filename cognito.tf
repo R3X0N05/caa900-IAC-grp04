@@ -49,7 +49,7 @@ resource "aws_cognito_user_pool_client" "rexony" {
   ]
 
   supported_identity_providers         = ["COGNITO"]
-  callback_urls                        = ["https://main.${aws_amplify_app.rexony.default_domain}/"]
+  callback_urls                        = ["https://localhost:3000/"]
   allowed_oauth_flows                  = ["code"]
   allowed_oauth_scopes                 = ["email", "openid", "phone"]
   allowed_oauth_flows_user_pool_client = true
