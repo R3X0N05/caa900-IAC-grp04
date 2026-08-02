@@ -19,7 +19,7 @@ output "amplify_app_id" {
 }
 
 output "amplify_url" {
-  value       = "https://main.${aws_amplify_app.rexony.default_domain}"
+  value       = "https://testtf.${aws_amplify_app.rexony.default_domain}"
   description = "Frontend URL — update aws-config.js and Cognito callback if needed"
 }
 
