@@ -2,7 +2,6 @@
 # Locals
 # ──────────────────────────────────────────────────────────────
 locals {
-  # Standard MOCK CORS OPTIONS integration — reused on every path
   cors_mock = {
     type = "MOCK"
     requestTemplates = { "application/json" = "{\"statusCode\": 200}" }
@@ -19,7 +18,18 @@ locals {
     }
   }
 
-  # Lambda proxy integration helpers — one per function
+  # OPTIONS method response — declares CORS headers so API GW accepts the mapping
+  cors_options_response = {
+    "200" = {
+      description = "OK"
+      headers = {
+        "Access-Control-Allow-Methods" = { schema = { type = "string" } }
+        "Access-Control-Allow-Headers" = { schema = { type = "string" } }
+        "Access-Control-Allow-Origin"  = { schema = { type = "string" } }
+      }
+    }
+  }
+
   int_products = {
     type                = "aws_proxy"
     httpMethod          = "POST"
@@ -62,9 +72,6 @@ locals {
   }
 }
 
-# ──────────────────────────────────────────────────────────────
-# REST API
-# ──────────────────────────────────────────────────────────────
 resource "aws_api_gateway_rest_api" "rexony" {
   name        = "rexony-api"
   description = "Rexony e-commerce API — Group 04"
@@ -123,11 +130,9 @@ resource "aws_api_gateway_rest_api" "rexony" {
 
     paths = {
 
-      # ── PRODUCTS ────────────────────────────────────────────
-
       "/products" = {
         get     = { "x-amazon-apigateway-integration" = local.int_products }
-        options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock }
+        options = { responses = local.cors_options_response, "x-amazon-apigateway-integration" = local.cors_mock }
       }
 
       "/product/{id}" = {
@@ -137,35 +142,33 @@ resource "aws_api_gateway_rest_api" "rexony" {
         }
         options = {
           parameters = [{ name = "id", in = "path", required = true, schema = { type = "string" } }]
-          responses  = { "200" = { description = "OK" } }
+          responses  = local.cors_options_response
           "x-amazon-apigateway-integration" = local.cors_mock
         }
       }
 
       "/contact" = {
         post    = { "x-amazon-apigateway-integration" = local.int_orders }
-        options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock }
+        options = { responses = local.cors_options_response, "x-amazon-apigateway-integration" = local.cors_mock }
       }
 
       "/reviews" = {
         get     = { "x-amazon-apigateway-integration" = local.int_products }
-        options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock }
+        options = { responses = local.cors_options_response, "x-amazon-apigateway-integration" = local.cors_mock }
       }
 
       "/review" = {
         put     = { "x-amazon-apigateway-integration" = local.int_products }
         delete  = { "x-amazon-apigateway-integration" = local.int_products }
-        options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock }
+        options = { responses = local.cors_options_response, "x-amazon-apigateway-integration" = local.cors_mock }
       }
-
-      # ── ADMIN PRODUCTS ───────────────────────────────────────
 
       "/admin/products" = {
         get = {
           security = [{ CognitoAuth = [] }]
           "x-amazon-apigateway-integration" = local.int_products
         }
-        options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock }
+        options = { responses = local.cors_options_response, "x-amazon-apigateway-integration" = local.cors_mock }
       }
 
       "/admin/product" = {
@@ -173,7 +176,7 @@ resource "aws_api_gateway_rest_api" "rexony" {
           security = [{ CognitoAuth = [] }]
           "x-amazon-apigateway-integration" = local.int_products
         }
-        options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock }
+        options = { responses = local.cors_options_response, "x-amazon-apigateway-integration" = local.cors_mock }
       }
 
       "/admin/product/new" = {
@@ -181,7 +184,7 @@ resource "aws_api_gateway_rest_api" "rexony" {
           security = [{ CognitoAuth = [] }]
           "x-amazon-apigateway-integration" = local.int_products
         }
-        options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock }
+        options = { responses = local.cors_options_response, "x-amazon-apigateway-integration" = local.cors_mock }
       }
 
       "/admin/product/{id}" = {
@@ -200,19 +203,17 @@ resource "aws_api_gateway_rest_api" "rexony" {
         }
         options = {
           parameters = [{ name = "id", in = "path", required = true, schema = { type = "string" } }]
-          responses  = { "200" = { description = "OK" } }
+          responses  = local.cors_options_response
           "x-amazon-apigateway-integration" = local.cors_mock
         }
       }
 
-      # ── ORDERS ───────────────────────────────────────────────
-
-      "/order"   = { options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock } }
-      "/orders"  = { options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock } }
+      "/order"  = { options = { responses = local.cors_options_response, "x-amazon-apigateway-integration" = local.cors_mock } }
+      "/orders" = { options = { responses = local.cors_options_response, "x-amazon-apigateway-integration" = local.cors_mock } }
 
       "/order/new" = {
         post    = { "x-amazon-apigateway-integration" = local.int_orders }
-        options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock }
+        options = { responses = local.cors_options_response, "x-amazon-apigateway-integration" = local.cors_mock }
       }
 
       "/orders/me" = {
@@ -220,13 +221,13 @@ resource "aws_api_gateway_rest_api" "rexony" {
           security = [{ CognitoAuth = [] }]
           "x-amazon-apigateway-integration" = local.int_orders
         }
-        options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock }
+        options = { responses = local.cors_options_response, "x-amazon-apigateway-integration" = local.cors_mock }
       }
 
       "/order/{id}" = {
         options = {
           parameters = [{ name = "id", in = "path", required = true, schema = { type = "string" } }]
-          responses  = { "200" = { description = "OK" } }
+          responses  = local.cors_options_response
           "x-amazon-apigateway-integration" = local.cors_mock
         }
       }
@@ -238,7 +239,7 @@ resource "aws_api_gateway_rest_api" "rexony" {
         }
         options = {
           parameters = [{ name = "id", in = "path", required = true, schema = { type = "string" } }]
-          responses  = { "200" = { description = "OK" } }
+          responses  = local.cors_options_response
           "x-amazon-apigateway-integration" = local.cors_mock
         }
       }
@@ -248,11 +249,11 @@ resource "aws_api_gateway_rest_api" "rexony" {
           security = [{ CognitoAuth = [] }]
           "x-amazon-apigateway-integration" = local.int_orders
         }
-        options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock }
+        options = { responses = local.cors_options_response, "x-amazon-apigateway-integration" = local.cors_mock }
       }
 
       "/admin/order" = {
-        options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock }
+        options = { responses = local.cors_options_response, "x-amazon-apigateway-integration" = local.cors_mock }
       }
 
       "/admin/order/{id}" = {
@@ -268,7 +269,7 @@ resource "aws_api_gateway_rest_api" "rexony" {
         }
         options = {
           parameters = [{ name = "id", in = "path", required = true, schema = { type = "string" } }]
-          responses  = { "200" = { description = "OK" } }
+          responses  = local.cors_options_response
           "x-amazon-apigateway-integration" = local.cors_mock
         }
       }
@@ -280,12 +281,10 @@ resource "aws_api_gateway_rest_api" "rexony" {
         }
         options = {
           parameters = [{ name = "id", in = "path", required = true, schema = { type = "string" } }]
-          responses  = { "200" = { description = "OK" } }
+          responses  = local.cors_options_response
           "x-amazon-apigateway-integration" = local.cors_mock
         }
       }
-
-      # ── CART ─────────────────────────────────────────────────
 
       "/cart" = {
         get = {
@@ -300,7 +299,7 @@ resource "aws_api_gateway_rest_api" "rexony" {
           security = [{ CognitoAuth = [] }]
           "x-amazon-apigateway-integration" = local.int_cart
         }
-        options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock }
+        options = { responses = local.cors_options_response, "x-amazon-apigateway-integration" = local.cors_mock }
       }
 
       "/cart/clear" = {
@@ -308,7 +307,7 @@ resource "aws_api_gateway_rest_api" "rexony" {
           security = [{ CognitoAuth = [] }]
           "x-amazon-apigateway-integration" = local.int_cart
         }
-        options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock }
+        options = { responses = local.cors_options_response, "x-amazon-apigateway-integration" = local.cors_mock }
       }
 
       "/cart/{productId}" = {
@@ -319,26 +318,22 @@ resource "aws_api_gateway_rest_api" "rexony" {
         }
         options = {
           parameters = [{ name = "productId", in = "path", required = true, schema = { type = "string" } }]
-          responses  = { "200" = { description = "OK" } }
+          responses  = local.cors_options_response
           "x-amazon-apigateway-integration" = local.cors_mock
         }
       }
 
-      # ── PAYMENT ──────────────────────────────────────────────
-
       "/payment" = {
-        options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock }
+        options = { responses = local.cors_options_response, "x-amazon-apigateway-integration" = local.cors_mock }
       }
 
       "/payment/checkout" = {
         post    = { "x-amazon-apigateway-integration" = local.int_payment }
-        options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock }
+        options = { responses = local.cors_options_response, "x-amazon-apigateway-integration" = local.cors_mock }
       }
 
-      # ── USERS (admin) ─────────────────────────────────────────
-
       "/admin/user" = {
-        options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock }
+        options = { responses = local.cors_options_response, "x-amazon-apigateway-integration" = local.cors_mock }
       }
 
       "/admin/users" = {
@@ -346,7 +341,7 @@ resource "aws_api_gateway_rest_api" "rexony" {
           security = [{ CognitoAuth = [] }]
           "x-amazon-apigateway-integration" = local.int_users
         }
-        options = { responses = { "200" = { description = "OK" } }, "x-amazon-apigateway-integration" = local.cors_mock }
+        options = { responses = local.cors_options_response, "x-amazon-apigateway-integration" = local.cors_mock }
       }
 
       "/admin/user/{id}" = {
@@ -365,7 +360,7 @@ resource "aws_api_gateway_rest_api" "rexony" {
         }
         options = {
           parameters = [{ name = "id", in = "path", required = true, schema = { type = "string" } }]
-          responses  = { "200" = { description = "OK" } }
+          responses  = local.cors_options_response
           "x-amazon-apigateway-integration" = local.cors_mock
         }
       }
@@ -400,7 +395,7 @@ resource "aws_cloudwatch_log_group" "api_gateway" {
   tags              = { Project = "rexony", Group = "04" }
 }
 
-# ── CloudWatch account-level role (required for API GW logging) ──
+# ── CloudWatch account-level role ────────────────────────────
 resource "aws_iam_role" "api_gateway_cloudwatch" {
   name = "rexony-apigw-cloudwatch-role"
   assume_role_policy = jsonencode({
