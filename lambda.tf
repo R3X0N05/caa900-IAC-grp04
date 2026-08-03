@@ -39,6 +39,13 @@ resource "aws_lambda_function" "payment" {
   memory_size      = local.lambda_defaults.memory_size
   filename         = local.lambda_defaults.filename
   source_code_hash = local.lambda_defaults.source_hash
+
+  environment {
+    variables = {
+      FRONTEND_URL = "https://testtf.${aws_amplify_app.rexony.default_domain}"
+    }
+  }
+
   lifecycle { ignore_changes = [filename, source_code_hash] }
 }
 
