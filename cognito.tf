@@ -12,7 +12,7 @@ resource "aws_cognito_user_pool" "rexony" {
   }
 
   schema {
-    name                     = "custom:role"
+    name                     = "role"
     attribute_data_type      = "String"
     mutable                  = true
     required                 = false
