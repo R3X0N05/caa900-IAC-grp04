@@ -15,7 +15,7 @@ This repository provisions **all AWS resources** for the Rexony platform and out
 
 ## Architecture
 
-![Rexony Architecture Diagram](./architecture.png)
+![Rexony Architecture Diagram](./architecture.jpg)
 
 > Website visitors hit **CloudFront + WAF** for caching and security, then reach the **Amplify**-hosted SPA. The frontend authenticates through **Cognito**, calls **API Gateway** (JWT-protected), which routes to the appropriate **Lambda** function. Orders, products, and cart are stored in **DynamoDB**. The payment Lambda runs in a **VPC private subnet** and calls **Stripe**. Order events trigger **SES** confirmation emails via DynamoDB Streams. **CloudWatch** captures logs and alarms. All infrastructure is defined and deployed from this repository via Terraform.
 
